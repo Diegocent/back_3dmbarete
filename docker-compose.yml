@@ -1,13 +1,16 @@
 # Desarrollo / prueba local con MySQL en contenedor.
 # Desde la carpeta `back/`:
+#   Creá `back/.env` con al menos PUBLIC_FILES_BASE_URL (URL pública del API, la que usará el front) y CORS_ORIGIN.
 #   docker compose up --build
-# API: http://localhost:3056  |  MySQL: localhost:3307 (usuario mbarete / mbarete_dev, BD mbarete)
+# MySQL expuesto en el host en el puerto 3307.
 #
 # MySQL remota (Hostinger, etc.): usá `docker-compose.remote-db.yml` + `.env.docker`
 #   copy .env.docker.example .env.docker  →  npm run docker:up
 #
 # Producción (DigitalOcean, etc.): imagen del Dockerfile + variables de entorno
 # (MySQL gestionada o remota; sin servicio mysql en compose).
+#
+# Limpieza diaria de uploads huérfanos: supercronic al iniciar el contenedor (back/crontab). No corre dentro del servidor HTTP.
 
 services:
   api:
@@ -20,9 +23,11 @@ services:
       NODE_ENV: production
       PORT: "3056"
       LISTEN_HOST: 0.0.0.0
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:3000}
-      PUBLIC_FILES_BASE_URL: ${PUBLIC_FILES_BASE_URL:-http://localhost:3056}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      PUBLIC_FILES_BASE_URL: ${PUBLIC_FILES_BASE_URL:?Definí PUBLIC_FILES_BASE_URL en back/.env (URL pública del API, sin barra final).}
       OWNER_EMAIL: ${OWNER_EMAIL:-}
+      # supercronic + crontab (ver back/crontab). Desactivar: ENABLE_UPLOAD_CLEANUP_CRON=0
+      ENABLE_UPLOAD_CLEANUP_CRON: ${ENABLE_UPLOAD_CLEANUP_CRON:-1}
     depends_on:
       mysql:
         condition: service_healthy

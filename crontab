@@ -1,0 +1,4 @@
+# Formato cron estándar (5 campos). Lo ejecuta supercronic dentro del contenedor (ver Dockerfile y docker-entrypoint.sh).
+# Hora del reloj del contenedor (UTC salvo que definas TZ en el servicio).
+# Solo limpieza de uploads huérfanos: proceso aparte (dist/scripts/cleanup-uploads.js), no el servidor HTTP.
+0 6 * * * cd /app && /usr/local/bin/node dist/scripts/cleanup-uploads.js

@@ -8,6 +8,11 @@ import {
 } from "../lib/validators";
 import { LOYALTY_CODE_VALIDITY_DAYS } from "../lib/constants";
 import { authRequired, requireAdmin } from "../middlewares/authMiddleware";
+import {
+  collectUploadPathsFromPartner,
+  collectUploadPathsFromProduct,
+  deleteUploadFilesIfUnreferenced,
+} from "../lib/upload-storage";
 
 const router = Router();
 
@@ -86,6 +91,15 @@ router.patch("/admin/products/:id", async (req, res, next) => {
       res.status(400).json({ error: "URL de especificaciones inválida" });
       return;
     }
+    const previous = await prisma.product.findUnique({
+      where: { id: req.params.id },
+      select: { imagesJson: true, specsFileUrl: true },
+    });
+    if (!previous) {
+      res.status(404).json({ error: "No encontrado" });
+      return;
+    }
+
     await prisma.product.update({
       where: { id: req.params.id },
       data: {
@@ -103,6 +117,8 @@ router.patch("/admin/products/:id", async (req, res, next) => {
         published: parsed.data.published ?? true,
       },
     });
+
+    await deleteUploadFilesIfUnreferenced(collectUploadPathsFromProduct(previous));
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -111,7 +127,17 @@ router.patch("/admin/products/:id", async (req, res, next) => {
 
 router.delete("/admin/products/:id", async (req, res, next) => {
   try {
+    const row = await prisma.product.findUnique({
+      where: { id: req.params.id },
+      select: { imagesJson: true, specsFileUrl: true },
+    });
+    if (!row) {
+      res.status(404).json({ error: "No encontrado" });
+      return;
+    }
+    const paths = collectUploadPathsFromProduct(row);
     await prisma.product.delete({ where: { id: req.params.id } });
+    await deleteUploadFilesIfUnreferenced(paths);
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -290,6 +316,15 @@ router.patch("/admin/partners/:id", async (req, res, next) => {
       return;
     }
     const d = parsed.data;
+    const previous = await prisma.partnerCompany.findUnique({
+      where: { id: req.params.id },
+      select: { imageUrl: true },
+    });
+    if (!previous) {
+      res.status(404).json({ error: "No encontrado" });
+      return;
+    }
+
     await prisma.partnerCompany.update({
       where: { id: req.params.id },
       data: {
@@ -304,6 +339,8 @@ router.patch("/admin/partners/:id", async (req, res, next) => {
         published: d.published ?? true,
       },
     });
+
+    await deleteUploadFilesIfUnreferenced(collectUploadPathsFromPartner(previous));
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -312,7 +349,17 @@ router.patch("/admin/partners/:id", async (req, res, next) => {
 
 router.delete("/admin/partners/:id", async (req, res, next) => {
   try {
+    const row = await prisma.partnerCompany.findUnique({
+      where: { id: req.params.id },
+      select: { imageUrl: true },
+    });
+    if (!row) {
+      res.status(404).json({ error: "No encontrado" });
+      return;
+    }
+    const paths = collectUploadPathsFromPartner(row);
     await prisma.partnerCompany.delete({ where: { id: req.params.id } });
+    await deleteUploadFilesIfUnreferenced(paths);
     res.json({ ok: true });
   } catch (e) {
     next(e);

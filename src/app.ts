@@ -43,7 +43,8 @@ app.get("/", (req, res) => {
       auth: "POST /api/auth/login, GET /api/auth/session, POST /api/auth/logout",
       publico:
         "POST /api/register, POST /api/contact, GET /api/search, GET /api/products, GET /api/products/by-slug/:slug, GET /api/partners",
-      pedidos: "POST /api/checkout, POST /api/orders/expire (header x-cron-secret)",
+      pedidos:
+        "POST /api/checkout, POST /api/orders/expire, POST /api/maintenance/cleanup-uploads (header x-cron-secret)",
       salud: "GET /api/health, GET /api/health/database",
       admin: "Bearer ADMIN — /api/admin/* (productos, pedidos, usuarios, códigos, empresas)",
       archivos: "POST /api/panel/upload (ADMIN), GET /uploads/...",

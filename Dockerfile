@@ -1,6 +1,9 @@
 # API 3D Mbarete — imagen de producción (Node 20 + Prisma + Express)
 # Build: docker build -t 3d-mbarete-api ./back
 # Run:  docker-compose.yml (MySQL local) o docker-compose.remote-db.yml + .env.docker
+#
+# Limpieza diaria de uploads huérfanos: supercronic + `crontab` en la raíz del repo (ver docker-entrypoint.sh).
+# Desactivar: ENABLE_UPLOAD_CLEANUP_CRON=0
 
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
@@ -28,7 +31,18 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 RUN apt-get update -y \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && apt-get install -y --no-install-recommends openssl ca-certificates curl \
+  && SC_VER=0.2.33 \
+  && ARCH="$(dpkg --print-architecture)" \
+  && case "$ARCH" in \
+       amd64) SC=supercronic-linux-amd64 ;; \
+       arm64) SC=supercronic-linux-arm64 ;; \
+       *) echo "supercronic: arquitectura no soportada: $ARCH" >&2; exit 1 ;; \
+     esac \
+  && curl -fsSL -o /usr/local/bin/supercronic "https://github.com/aptible/supercronic/releases/download/v${SC_VER}/${SC}" \
+  && chmod +x /usr/local/bin/supercronic \
+  && apt-get purge -y curl \
+  && apt-get autoremove -y \
   && rm -rf /var/lib/apt/lists/* \
   && groupadd --gid 1001 nodejs \
   && useradd --uid 1001 --gid nodejs --shell /usr/sbin/nologin --create-home nodejs
@@ -38,9 +52,11 @@ COPY prisma ./prisma
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY crontab /app/crontab
 
 # Quitar CRLF si el build se hace desde Windows (evita: exec ... no such file or directory)
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
+  && sed -i 's/\r$//' /app/crontab \
   && chmod +x /usr/local/bin/docker-entrypoint.sh \
   && mkdir -p storage/uploads \
   && chown -R nodejs:nodejs /app

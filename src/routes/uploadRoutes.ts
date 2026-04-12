@@ -14,6 +14,7 @@ const MAX_PDF = 15 * 1024 * 1024;
 const IMAGE_EXT: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/jpg": ".jpg",
+  "image/pjpeg": ".jpg",
   "image/png": ".png",
   "image/webp": ".webp",
   "image/gif": ".gif",
@@ -34,7 +35,12 @@ const upload = multer({
 });
 
 function publicUploadUrl(localPath: string): string {
-  const base = env.publicFilesBaseUrl || `http://localhost:${env.port}`;
+  const base = env.publicFilesBaseUrl.replace(/\/$/, "");
+  if (!base) {
+    throw new Error(
+      "Definí PUBLIC_FILES_BASE_URL o PUBLIC_BASE_URL en el entorno (URL pública del API, sin barra final).",
+    );
+  }
   return `${base}${localPath}`;
 }
 

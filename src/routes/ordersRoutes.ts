@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { env } from "../config/env";
 import logger from "../config/logger";
+import { cleanupOrphanUploadFiles } from "../lib/upload-storage";
 
 const router = Router();
 
@@ -80,6 +81,23 @@ router.post("/orders/expire", async (req, res, next) => {
       expiredOrders: expired.length,
       restoredItems: restored,
     });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** Limpieza de archivos en disco no referenciados en BD (cron diario, mismo header que orders/expire). */
+router.post("/maintenance/cleanup-uploads", async (req, res, next) => {
+  try {
+    const secret = req.headers["x-cron-secret"];
+    const headerSecret = typeof secret === "string" ? secret : Array.isArray(secret) ? secret[0] : "";
+    if (env.cronSecret && headerSecret !== env.cronSecret) {
+      res.status(401).json({ error: "No autorizado" });
+      return;
+    }
+
+    const report = await cleanupOrphanUploadFiles();
+    res.json({ ok: true, ...report });
   } catch (e) {
     next(e);
   }

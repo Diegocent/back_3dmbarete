@@ -5,7 +5,9 @@
 #   2) Editá .env.docker (DATABASE_URL, AUTH_SECRET, CORS_ORIGIN, PUBLIC_FILES_BASE_URL)
 #   3) npm run docker:up
 #
-# Probar: http://localhost:3056/api/health
+# Probar: GET {PUBLIC_FILES_BASE_URL}/api/health (definí PUBLIC_FILES_BASE_URL en `.env.docker`)
+#
+# Limpieza diaria de uploads: supercronic + back/crontab al iniciar el contenedor. Desactivar: ENABLE_UPLOAD_CLEANUP_CRON=0 en `.env.docker`.
 #
 # En Hostinger: MySQL remoto debe permitir tu IP (o %) para que este contenedor conecte.
 
