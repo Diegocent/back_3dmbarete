@@ -1,0 +1,54 @@
+# Desarrollo / prueba local con MySQL en contenedor.
+# Desde la carpeta `back/`:
+#   docker compose up --build
+# API: http://localhost:3056  |  MySQL: localhost:3307 (usuario mbarete / mbarete_dev, BD mbarete)
+#
+# MySQL remota (Hostinger, etc.): usá `docker-compose.remote-db.yml` + `.env.docker`
+#   copy .env.docker.example .env.docker  →  npm run docker:up
+#
+# Producción (DigitalOcean, etc.): imagen del Dockerfile + variables de entorno
+# (MySQL gestionada o remota; sin servicio mysql en compose).
+
+services:
+  api:
+    build: .
+    ports:
+      - "3056:3056"
+    environment:
+      DATABASE_URL: mysql://mbarete:mbarete_dev@mysql:3306/mbarete
+      AUTH_SECRET: ${AUTH_SECRET:-docker-local-auth-secret-min-32-chars!!}
+      NODE_ENV: production
+      PORT: "3056"
+      LISTEN_HOST: 0.0.0.0
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:3000}
+      PUBLIC_FILES_BASE_URL: ${PUBLIC_FILES_BASE_URL:-http://localhost:3056}
+      OWNER_EMAIL: ${OWNER_EMAIL:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - api_uploads:/app/storage/uploads
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: rootdev_only_local
+      MYSQL_DATABASE: mbarete
+      MYSQL_USER: mbarete
+      MYSQL_PASSWORD: mbarete_dev
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-prootdev_only_local"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  api_uploads:
+  mysql_data:

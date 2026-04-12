@@ -1,0 +1,99 @@
+// Misma base de datos que `web` (tienda 3D Mbarete). MySQL local o remoto.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  passwordHash       String
+  name               String?
+  role               String    @default("CUSTOMER")
+  loyaltyExpiresAt   DateTime?
+  loyaltyVerifiedAt  DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  orders             Order[]
+
+  @@index([createdAt])
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  category      String
+  name          String
+  slug          String   @unique
+  shortDesc     String
+  description   String   @db.Text
+  imagesJson    String   @db.LongText
+  specsFileUrl  String?
+  technicalTip  String?
+  priceCents    Int?
+  stock         Int      @default(0)
+  loyaltyOnly   Boolean  @default(false)
+  published     Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Order {
+  id            String    @id @default(cuid())
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id])
+  guestEmail    String?
+  guestName     String?   @db.VarChar(120)
+  guestPhone    String?   @db.VarChar(40)
+  guestAddress  String?   @db.VarChar(500)
+  itemsJson     String    @db.Text
+  status        String    @default("PENDING")
+  notes         String?
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([expiresAt])
+}
+
+model ContactRequest {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  message   String   @db.Text
+  type      String
+  createdAt DateTime @default(now())
+}
+
+model LoyaltyCode {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  usedById  String?
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([code])
+  @@index([expiresAt])
+}
+
+model PartnerCompany {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  description  String   @db.Text
+  location     String?  @db.VarChar(200)
+  contactPhone String?  @db.VarChar(60)
+  websiteUrl   String?  @db.VarChar(500)
+  imageUrl     String?  @db.VarChar(500)
+  sortOrder    Int      @default(0)
+  published    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([published, sortOrder])
+}

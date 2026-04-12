@@ -1,0 +1,68 @@
+{
+  "name": "3d-mbarete-api",
+  "version": "1.0.0",
+  "description": "API Express + Prisma (MySQL) para la tienda 3D Mbarete",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "cross-env NODE_ENV=development nodemon --watch src --exec ts-node src/index.ts",
+    "build": "tsc",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio",
+    "db:setup": "prisma generate && prisma migrate deploy && prisma db seed",
+    "db:verify": "ts-node --transpile-only scripts/verify-database.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run src/integration",
+    "test:endpoints": "vitest run src/integration/all-endpoints.integration.test.ts",
+    "docker:build": "docker build -t 3d-mbarete-api:local .",
+    "docker:up": "docker compose -f docker-compose.remote-db.yml up --build",
+    "docker:up:detached": "docker compose -f docker-compose.remote-db.yml up --build -d",
+    "docker:down": "docker compose -f docker-compose.remote-db.yml down",
+    "docker:logs": "docker compose -f docker-compose.remote-db.yml logs -f api"
+  },
+  "prisma": {
+    "seed": "ts-node --transpile-only prisma/seed.ts"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^6.3.1",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^1.4.5-lts.1",
+    "prisma": "^6.3.1",
+    "winston": "^3.14.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.13.4",
+    "@types/supertest": "^6.0.3",
+    "cross-env": "^7.0.3",
+    "eslint": "^9.11.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.2.1",
+    "nodemon": "^2.0.22",
+    "prettier": "^3.3.3",
+    "supertest": "^7.2.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}

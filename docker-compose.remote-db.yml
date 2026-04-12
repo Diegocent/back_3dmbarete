@@ -1,0 +1,24 @@
+# API con MySQL remota (Hostinger, DigitalOcean Managed MySQL, etc.).
+# Desde la carpeta `back/`:
+#
+#   1) copy .env.docker.example .env.docker
+#   2) Editá .env.docker (DATABASE_URL, AUTH_SECRET, CORS_ORIGIN, PUBLIC_FILES_BASE_URL)
+#   3) npm run docker:up
+#
+# Probar: http://localhost:3056/api/health
+#
+# En Hostinger: MySQL remoto debe permitir tu IP (o %) para que este contenedor conecte.
+
+services:
+  api:
+    build: .
+    env_file:
+      - .env.docker
+    ports:
+      - "${DOCKER_API_PORT:-3056}:3056"
+    volumes:
+      - api_uploads_remote:/app/storage/uploads
+    restart: unless-stopped
+
+volumes:
+  api_uploads_remote:
