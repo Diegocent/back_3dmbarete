@@ -9,7 +9,6 @@ import { authRequired, requireAdmin } from "../middlewares/authMiddleware";
 const router = Router();
 
 const MAX_IMAGE = 5 * 1024 * 1024;
-const MAX_PDF = 15 * 1024 * 1024;
 
 const IMAGE_EXT: Record<string, string> = {
   "image/jpeg": ".jpg",
@@ -31,7 +30,7 @@ function imageExtFromFileName(name: string): string | undefined {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_PDF },
+  limits: { fileSize: MAX_IMAGE },
 });
 
 function publicUploadUrl(localPath: string): string {
@@ -60,48 +59,30 @@ router.post(
         res.status(400).json({ error: "Falta el archivo" });
         return;
       }
-      if (kind !== "image" && kind !== "pdf") {
-        res.status(400).json({ error: "Tipo inválido" });
+      if (kind !== "image") {
+        res.status(400).json({ error: "Tipo inválido (solo imágenes)" });
         return;
       }
 
       const buf = file.buffer;
 
-      if (kind === "image") {
-        if (buf.length > MAX_IMAGE) {
-          res.status(400).json({ error: "Imagen demasiado grande (máx. 5 MB)" });
-          return;
-        }
-        const ext = IMAGE_EXT[file.mimetype] ?? imageExtFromFileName(file.originalname);
-        if (!ext) {
-          res.status(400).json({
-            error:
-              "Solo JPEG, PNG, WebP o GIF (si tu sistema no envía el tipo MIME, usá extensión .jpg / .png / .webp / .gif)",
-          });
-          return;
-        }
-        const name = `${Date.now()}-${randomBytes(6).toString("hex")}${ext}`;
-        const dir = path.join(process.cwd(), "storage", "uploads", uploadScope);
-        await fs.mkdir(dir, { recursive: true });
-        await fs.writeFile(path.join(dir, name), buf);
-        const localPath = `/uploads/${uploadScope}/${name}`;
-        res.json({ url: publicUploadUrl(localPath) });
+      if (buf.length > MAX_IMAGE) {
+        res.status(400).json({ error: "Imagen demasiado grande (máx. 5 MB)" });
         return;
       }
-
-      if (buf.length > MAX_PDF) {
-        res.status(400).json({ error: "PDF demasiado grande (máx. 15 MB)" });
+      const ext = IMAGE_EXT[file.mimetype] ?? imageExtFromFileName(file.originalname);
+      if (!ext) {
+        res.status(400).json({
+          error:
+            "Solo JPEG, PNG, WebP o GIF (si tu sistema no envía el tipo MIME, usá extensión .jpg / .png / .webp / .gif)",
+        });
         return;
       }
-      if (file.mimetype !== "application/pdf") {
-        res.status(400).json({ error: "Solo archivos PDF" });
-        return;
-      }
-      const name = `${Date.now()}-${randomBytes(6).toString("hex")}.pdf`;
-      const dir = path.join(process.cwd(), "storage", "uploads", "products");
+      const name = `${Date.now()}-${randomBytes(6).toString("hex")}${ext}`;
+      const dir = path.join(process.cwd(), "storage", "uploads", uploadScope);
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(path.join(dir, name), buf);
-      const localPath = `/uploads/products/${name}`;
+      const localPath = `/uploads/${uploadScope}/${name}`;
       res.json({ url: publicUploadUrl(localPath) });
     } catch (e) {
       next(e);

@@ -4,6 +4,7 @@
   "description": "API Express + Prisma (MySQL) para la tienda 3D Mbarete",
   "main": "dist/index.js",
   "scripts": {
+    "postinstall": "prisma generate",
     "start": "node dist/index.js",
     "dev": "cross-env NODE_ENV=development nodemon --watch src --exec ts-node src/index.ts",
     "build": "tsc",

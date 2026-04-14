@@ -18,19 +18,6 @@ const router = Router();
 
 router.use(authRequired, requireAdmin);
 
-const UPLOAD_SPECS = /^\/uploads\/products\/[A-Za-z0-9._-]+$/;
-
-function normalizeSpecsUrl(url: string | undefined) {
-  const t = url?.trim();
-  if (!t) return null;
-  if (UPLOAD_SPECS.test(t)) return t;
-  try {
-    return new URL(t).toString();
-  } catch {
-    return null;
-  }
-}
-
 function normalizeOptional(s: string | undefined) {
   const t = s?.trim();
   return t ? t : null;
@@ -52,11 +39,6 @@ router.post("/admin/products", async (req, res, next) => {
       res.status(400).json({ error: "Datos inválidos" });
       return;
     }
-    const specs = normalizeSpecsUrl(parsed.data.specsFileUrl);
-    if (parsed.data.specsFileUrl && parsed.data.specsFileUrl.trim() && !specs) {
-      res.status(400).json({ error: "URL de especificaciones inválida" });
-      return;
-    }
     await prisma.product.create({
       data: {
         category: parsed.data.category,
@@ -65,7 +47,7 @@ router.post("/admin/products", async (req, res, next) => {
         shortDesc: parsed.data.shortDesc,
         description: parsed.data.description,
         imagesJson: parsed.data.imagesJson,
-        specsFileUrl: specs,
+        specsFileUrl: null,
         technicalTip: parsed.data.technicalTip?.trim() || null,
         priceCents: parsed.data.priceCents ?? null,
         stock: parsed.data.stock ?? 0,
@@ -86,11 +68,6 @@ router.patch("/admin/products/:id", async (req, res, next) => {
       res.status(400).json({ error: "Datos inválidos" });
       return;
     }
-    const specs = normalizeSpecsUrl(parsed.data.specsFileUrl);
-    if (parsed.data.specsFileUrl && parsed.data.specsFileUrl.trim() && !specs) {
-      res.status(400).json({ error: "URL de especificaciones inválida" });
-      return;
-    }
     const previous = await prisma.product.findUnique({
       where: { id: req.params.id },
       select: { imagesJson: true, specsFileUrl: true },
@@ -109,7 +86,7 @@ router.patch("/admin/products/:id", async (req, res, next) => {
         shortDesc: parsed.data.shortDesc,
         description: parsed.data.description,
         imagesJson: parsed.data.imagesJson,
-        specsFileUrl: specs,
+        specsFileUrl: null,
         technicalTip: parsed.data.technicalTip?.trim() || null,
         priceCents: parsed.data.priceCents ?? null,
         stock: parsed.data.stock ?? 0,

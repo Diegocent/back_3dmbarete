@@ -1,5 +1,9 @@
 # Node.js TypeScript Clean Architecture Template
 
+**Despliegue en Hostinger (API Node, sin Docker):** conectá el repo en GitHub al panel, **root = `back`**, build `npm ci && npm run build`, start `npm start`. Guía: [`deploy/HOSTINGER-API-NODE.md`](../deploy/HOSTINGER-API-NODE.md). ZIP de respaldo: `back/scripts/package-hostinger-node-zip.ps1`.
+
+---
+
 This project is a robust boilerplate for building scalable backend applications with Node.js and TypeScript, following Clean Architecture principles.
 
 ## 🚀 Features

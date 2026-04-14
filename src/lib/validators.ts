@@ -3,7 +3,6 @@ import { PRODUCT_CATEGORIES } from "./constants";
 
 export const productCategorySchema = z.enum(PRODUCT_CATEGORIES);
 
-const uploadSpecsPathRegex = /^\/uploads\/products\/[A-Za-z0-9._-]+$/;
 const uploadProductImagePathRegex = /^\/uploads\/products\/[A-Za-z0-9._-]+$/;
 const demoImagePathRegex = /^\/images\/[A-Za-z0-9._-]+$/;
 
@@ -17,16 +16,6 @@ export function isValidProductImageEntry(s: string): boolean {
   try {
     const u = new URL(t);
     return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function isValidSpecsRef(s: string): boolean {
-  if (uploadSpecsPathRegex.test(s)) return true;
-  try {
-    new URL(s);
-    return true;
   } catch {
     return false;
   }
@@ -81,15 +70,8 @@ export const productFormSchema = z.object({
       }
     }
   }),
-  specsFileUrl: z.preprocess(
-    (v) => (v === undefined || v === null ? "" : String(v)),
-    z.string().max(2048).superRefine((val, ctx) => {
-      if (val === "") return;
-      if (!isValidSpecsRef(val)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "URL o PDF subido inválido" });
-      }
-    }),
-  ),
+  /** Obsoleto: ya no se usan PDFs de especificaciones; siempre vacío. */
+  specsFileUrl: z.preprocess(() => "", z.literal("")),
   technicalTip: z.string().max(4000).optional().or(z.literal("")),
   priceCents: z.coerce.number().int().min(0).optional().nullable(),
   stock: z.coerce.number().int().min(0).optional().default(0),
