@@ -65,26 +65,19 @@ router.post("/checkout", authOptional, async (req: AuthRequest, res, next) => {
     const guestPhone = emptyToNull(parsed.data.guestPhone);
     const guestAddress = emptyToNull(parsed.data.guestAddress);
 
-    const order = await prisma.$transaction(async (tx) => {
-      for (const item of items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: item.qty } },
-        });
-      }
-      return tx.order.create({
-        data: {
-          userId: session?.sub ?? undefined,
-          guestEmail,
-          guestName,
-          guestPhone,
-          guestAddress,
-          itemsJson: JSON.stringify(items),
-          notes: parsed.data.notes || null,
-          status: "PENDING",
-          expiresAt,
-        },
-      });
+    /** Stock: por ahora no se descuenta al crear el pedido (solo solicitud; contacto manual). */
+    const order = await prisma.order.create({
+      data: {
+        userId: session?.sub ?? undefined,
+        guestEmail,
+        guestName,
+        guestPhone,
+        guestAddress,
+        itemsJson: JSON.stringify(items),
+        notes: parsed.data.notes || null,
+        status: "PENDING",
+        expiresAt,
+      },
     });
 
     const customer = {

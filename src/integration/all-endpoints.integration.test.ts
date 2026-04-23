@@ -203,6 +203,46 @@ describe.skipIf(!hasDb)("Endpoints API (lectura + auth + validaciones)", () => {
     expect(typeof res.body.expiredOrders).toBe("number");
   });
 
+  it("POST /api/auth/loyalty/redeem sin token -> 401", async () => {
+    await request(app).post("/api/auth/loyalty/redeem").send({ code: "MBR-00000000" }).expect(401);
+  });
+
+  it("POST /api/auth/loyalty/redeem con admin -> 403", async () => {
+    await request(app)
+      .post("/api/auth/loyalty/redeem")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ code: "MBR-00000000" })
+      .expect(403);
+  });
+
+  it("POST /api/auth/loyalty/redeem cliente con código válido", async () => {
+    const stamp = Date.now();
+    const email = `loy-redeem-${stamp}@test.local`;
+    await request(app)
+      .post("/api/register")
+      .send({ name: "Redeem Test", email, password: "password123", loyaltyCode: "" })
+      .expect(200);
+    const loginRes = await request(app).post("/api/auth/login").send({ email, password: "password123" }).expect(200);
+    const customerToken = loginRes.body.token as string;
+    const codeRes = await request(app)
+      .post("/api/admin/loyalty-codes")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ quantity: 1 })
+      .expect(200);
+    const code = (codeRes.body.codes as string[])[0];
+    const redeemRes = await request(app)
+      .post("/api/auth/loyalty/redeem")
+      .set("Authorization", `Bearer ${customerToken}`)
+      .send({ code })
+      .expect(200);
+    expect(redeemRes.body.ok).toBe(true);
+    expect(redeemRes.body.token).toBeTruthy();
+    expect(redeemRes.body.user?.loyaltyExpiresAt).toBeTruthy();
+    const newTok = redeemRes.body.token as string;
+    const sess = await request(app).get("/api/auth/session").set("Authorization", `Bearer ${newTok}`).expect(200);
+    expect(sess.body.user?.loyaltyExpiresAt).toBeTruthy();
+  });
+
   it("POST /api/auth/logout", async () => {
     await request(app).post("/api/auth/logout").set("Authorization", `Bearer ${adminToken}`).expect(200);
   });

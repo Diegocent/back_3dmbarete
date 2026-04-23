@@ -40,7 +40,8 @@ app.get("/", (req, res) => {
     nombre: "API 3D Mbarete",
     base: "/api",
     rutas: {
-      auth: "POST /api/auth/login, GET /api/auth/session, POST /api/auth/logout",
+      auth:
+        "POST /api/auth/login, GET /api/auth/session, POST /api/auth/logout, POST /api/auth/loyalty/redeem (Bearer cliente)",
       publico:
         "POST /api/register, POST /api/contact, GET /api/search, GET /api/products, GET /api/products/by-slug/:slug, GET /api/partners",
       pedidos:

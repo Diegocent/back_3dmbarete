@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contactSchema, isValidProductImageEntry, registerSchema } from "./validators";
+import { contactSchema, isValidProductImageEntry, redeemLoyaltyCodeSchema, registerSchema } from "./validators";
 
 describe("isValidProductImageEntry", () => {
   it("rechaza data URL (solo rutas o URLs)", () => {
@@ -32,6 +32,19 @@ describe("registerSchema", () => {
       email: "no-email",
       password: "password123",
     });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe("redeemLoyaltyCodeSchema", () => {
+  it("acepta código recortado", () => {
+    const r = redeemLoyaltyCodeSchema.safeParse({ code: "  MBR-ABCD1234  " });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.code).toBe("MBR-ABCD1234");
+  });
+
+  it("rechaza código corto", () => {
+    const r = redeemLoyaltyCodeSchema.safeParse({ code: "abc" });
     expect(r.success).toBe(false);
   });
 });

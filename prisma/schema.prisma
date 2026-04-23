@@ -16,29 +16,41 @@ model User {
   role               String    @default("CUSTOMER")
   loyaltyExpiresAt   DateTime?
   loyaltyVerifiedAt  DateTime?
+  loyaltyCodeId      String?
+  loyaltyCode        LoyaltyCode? @relation(fields: [loyaltyCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   orders             Order[]
 
   @@index([createdAt])
+  @@index([loyaltyCodeId])
 }
 
 model Product {
-  id            String   @id @default(cuid())
-  category      String
-  name          String
-  slug          String   @unique
-  shortDesc     String
-  description   String   @db.Text
-  imagesJson    String   @db.LongText
-  specsFileUrl  String?
-  technicalTip  String?
-  priceCents    Int?
-  stock         Int      @default(0)
-  loyaltyOnly   Boolean  @default(false)
-  published     Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String   @id @default(cuid())
+  category         String
+  name             String
+  slug             String   @unique
+  shortDesc        String
+  description      String   @db.Text
+  imagesJson       String   @db.LongText
+  specsFileUrl     String?
+  technicalTip     String?  @db.Text
+  priceCents       Int?
+  stock              Int      @default(0)
+  loyaltyOnly        Boolean  @default(false)
+  /** Si es true, en la tienda no se muestra precio y el CTA es “Pedir presupuesto” (contacto). */
+  requestQuoteOnly   Boolean  @default(false)
+  published          Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+/** Configuración global del sitio (una fila id = default). */
+model SiteSetting {
+  id           String   @id @default("default")
+  heroImageUrl String?  @db.VarChar(2000)
+  updatedAt    DateTime @updatedAt
 }
 
 model Order {
@@ -74,8 +86,12 @@ model LoyaltyCode {
   code      String    @unique
   usedById  String?
   usedAt    DateTime?
+  isActive  Boolean   @default(true)
+  /** Días de acceso que otorga este código al canjearse. */
+  validityDays Int    @default(90)
   expiresAt DateTime
   createdAt DateTime  @default(now())
+  users     User[]
 
   @@index([code])
   @@index([expiresAt])

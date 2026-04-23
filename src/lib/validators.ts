@@ -29,8 +29,8 @@ export const productFormSchema = z.object({
     .min(2)
     .max(120)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-  shortDesc: z.string().min(5).max(200),
-  description: z.string().min(10).max(8000),
+  shortDesc: z.string().min(5, "La descripción corta debe tener al menos 5 caracteres").max(200),
+  description: z.string().min(10, "La descripción debe tener al menos 10 caracteres").max(8000),
   imagesJson: z.string().superRefine((s, ctx) => {
     const MAX_JSON = 256 * 1024;
     const MAX_PER = 2048;
@@ -76,7 +76,13 @@ export const productFormSchema = z.object({
   priceCents: z.coerce.number().int().min(0).optional().nullable(),
   stock: z.coerce.number().int().min(0).optional().default(0),
   loyaltyOnly: z.boolean().optional(),
+  /** Oculta precio en tienda y muestra flujo “Pedir presupuesto”. */
+  requestQuoteOnly: z.boolean().optional(),
   published: z.boolean().optional(),
+});
+
+export const siteSettingSchema = z.object({
+  heroImageUrl: z.union([z.string().max(2000), z.literal(""), z.null()]),
 });
 
 export const registerSchema = z.object({
@@ -85,6 +91,26 @@ export const registerSchema = z.object({
   password: z.string().min(8).max(128),
   loyaltyCode: z.string().min(4).max(64).optional().or(z.literal("")),
 });
+
+/** Cliente ya registrado: activar código de fidelidad (sesión Bearer). */
+export const redeemLoyaltyCodeSchema = z.object({
+  code: z.string().trim().min(4).max(64),
+});
+
+export const adminCreateLoyaltyCodesSchema = z.object({
+  quantity: z.coerce.number().int().min(1).max(50),
+  validityDays: z.coerce.number().int().min(1).max(3650).optional().default(90),
+  isActive: z.boolean().optional().default(true),
+});
+
+export const adminUpdateLoyaltyCodeSchema = z
+  .object({
+    isActive: z.boolean().optional(),
+    validityDays: z.coerce.number().int().min(1).max(3650).optional(),
+  })
+  .refine((d) => d.isActive != null || d.validityDays != null, {
+    message: "Sin cambios para aplicar",
+  });
 
 export const contactSchema = z.object({
   name: z.string().min(2).max(80),

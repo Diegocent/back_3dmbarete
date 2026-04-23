@@ -1,5 +1,5 @@
 /**
- * Archivos bajo `storage/uploads/{products,partners}` referenciados en BD vs disco.
+ * Archivos bajo `storage/uploads/{products,partners,site}` referenciados en BD vs disco.
  */
 import path from "path";
 import fs from "fs/promises";
@@ -8,7 +8,7 @@ import { prisma } from "./prisma";
 import logger from "../config/logger";
 
 /** Solo rutas públicas que nosotros generamos al subir archivos. */
-const UPLOADS_PUBLIC_PATH = /^\/uploads\/(products|partners)\/[A-Za-z0-9._-]+$/;
+const UPLOADS_PUBLIC_PATH = /^\/uploads\/(products|partners|site)\/[A-Za-z0-9._-]+$/;
 
 export function extractUploadsPublicPath(ref: string | null | undefined): string | null {
   if (!ref?.trim()) return null;
@@ -45,6 +45,13 @@ export function collectUploadPathsFromProduct(row: Pick<Product, "imagesJson" | 
   } catch {
     /* ignore invalid JSON */
   }
+  return set;
+}
+
+export function collectUploadPathsFromSiteSetting(row: { heroImageUrl: string | null }): Set<string> {
+  const set = new Set<string>();
+  const u = extractUploadsPublicPath(row.heroImageUrl);
+  if (u) set.add(u);
   return set;
 }
 
@@ -102,6 +109,13 @@ export async function buildReferencedUploadPathsSet(): Promise<Set<string>> {
   for (const p of partners) {
     for (const u of collectUploadPathsFromPartner(p)) set.add(u);
   }
+  const site = await prisma.siteSetting.findUnique({
+    where: { id: "default" },
+    select: { heroImageUrl: true },
+  });
+  if (site) {
+    for (const u of collectUploadPathsFromSiteSetting(site)) set.add(u);
+  }
   return set;
 }
 
@@ -115,7 +129,7 @@ export async function cleanupOrphanUploadFiles(): Promise<{ scanned: number; rem
   let scanned = 0;
   let removed = 0;
 
-  for (const scope of ["products", "partners"] as const) {
+  for (const scope of ["products", "partners", "site"] as const) {
     const dir = path.join(uploadsRootDir(), scope);
     let entries: import("fs").Dirent[];
     try {

@@ -86,7 +86,7 @@ export function formatOrderEmailBody(
     notes ? `\nNotas del cliente:\n${notes}` : "",
     "",
     `Pedido ID: ${meta.orderId}`,
-    `Reserva hasta: ${meta.expiresAt.toLocaleString("es-PY")}`,
+    `Seguimiento interno (pendiente hasta): ${meta.expiresAt.toLocaleString("es-PY")}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -150,7 +150,7 @@ export function buildOrderEmailHtml(
               ${notesBlock}
               <div style="margin-top:22px;padding-top:18px;border-top:1px solid ${BRAND.border};font-size:13px;color:${BRAND.muted};">
                 <p style="margin:0 0 6px;"><strong style="color:${BRAND.text};">Pedido ID:</strong> <code style="background:${BRAND.bgSoft};padding:2px 6px;border-radius:4px;font-size:12px;">${escapeHtml(meta.orderId)}</code></p>
-                <p style="margin:0;"><strong style="color:${BRAND.text};">Reserva hasta:</strong> ${escapeHtml(meta.expiresAt.toLocaleString("es-PY"))}</p>
+                <p style="margin:0;"><strong style="color:${BRAND.text};">Seguimiento interno (pendiente hasta):</strong> ${escapeHtml(meta.expiresAt.toLocaleString("es-PY"))}</p>
               </div>
             </td>
           </tr>

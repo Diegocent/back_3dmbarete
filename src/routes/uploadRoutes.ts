@@ -53,7 +53,8 @@ router.post(
       const file = req.file;
       const kind = req.body?.kind;
       const scopeRaw = req.body?.scope;
-      const uploadScope = scopeRaw === "partners" ? "partners" : "products";
+      const uploadScope =
+        scopeRaw === "partners" ? "partners" : scopeRaw === "site" ? "site" : "products";
 
       if (!file) {
         res.status(400).json({ error: "Falta el archivo" });

@@ -44,28 +44,21 @@ router.post("/orders/expire", async (req, res, next) => {
       select: { id: true, itemsJson: true },
     });
 
-    let restored = 0;
+    let expiredItemUnits = 0;
     for (const order of expired) {
       try {
         const items = parseOrderItems(order.itemsJson);
         if (!items) {
-          logger.warn(`orders/expire: pedido ${order.id} con itemsJson inválido; se marca EXPIRED sin devolver stock`);
+          logger.warn(`orders/expire: pedido ${order.id} con itemsJson inválido; se marca EXPIRED`);
           await prisma.order.update({ where: { id: order.id }, data: { status: "EXPIRED" } });
           continue;
         }
-        await prisma.$transaction(async (tx) => {
-          for (const item of items) {
-            await tx.product.update({
-              where: { id: item.productId },
-              data: { stock: { increment: item.qty } },
-            });
-          }
-          await tx.order.update({
-            where: { id: order.id },
-            data: { status: "EXPIRED" },
-          });
+        /** Sin devolución de stock: el checkout ya no reserva/descontaba unidades. */
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { status: "EXPIRED" },
         });
-        restored += items.reduce((a, i) => a + i.qty, 0);
+        expiredItemUnits += items.reduce((a, i) => a + i.qty, 0);
       } catch (e) {
         logger.warn(`orders/expire: error procesando ${order.id}, se intenta solo marcar EXPIRED`, e);
         try {
@@ -79,7 +72,8 @@ router.post("/orders/expire", async (req, res, next) => {
     res.json({
       ok: true,
       expiredOrders: expired.length,
-      restoredItems: restored,
+      restoredItems: 0,
+      expiredItemUnits,
     });
   } catch (e) {
     next(e);

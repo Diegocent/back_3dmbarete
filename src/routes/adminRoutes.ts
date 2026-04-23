@@ -1,17 +1,21 @@
 import { Router } from "express";
 import { randomBytes } from "crypto";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import {
+  adminCreateLoyaltyCodesSchema,
+  adminUpdateLoyaltyCodeSchema,
   productFormSchema,
   partnerCompanyFormSchema,
+  siteSettingSchema,
 } from "../lib/validators";
-import { LOYALTY_CODE_VALIDITY_DAYS } from "../lib/constants";
 import { authRequired, requireAdmin } from "../middlewares/authMiddleware";
 import {
   collectUploadPathsFromPartner,
   collectUploadPathsFromProduct,
   deleteUploadFilesIfUnreferenced,
+  extractUploadsPublicPath,
 } from "../lib/upload-storage";
 
 const router = Router();
@@ -21,6 +25,14 @@ router.use(authRequired, requireAdmin);
 function normalizeOptional(s: string | undefined) {
   const t = s?.trim();
   return t ? t : null;
+}
+
+/** Slug duplicado (índice único `Product_slug_key`). */
+function isProductSlugUniqueViolation(e: unknown): boolean {
+  if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== "P2002") return false;
+  const t = e.meta?.target;
+  if (Array.isArray(t)) return t.some((x) => String(x).toLowerCase().includes("slug"));
+  return String(t ?? "").toLowerCase().includes("slug");
 }
 
 router.get("/admin/products", async (req, res, next) => {
@@ -36,7 +48,12 @@ router.post("/admin/products", async (req, res, next) => {
   try {
     const parsed = productFormSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "Datos inválidos" });
+      const issue = parsed.error.issues[0];
+      const field = issue?.path[0] != null ? String(issue.path[0]) : undefined;
+      res.status(400).json({
+        error: issue?.message ?? "Datos inválidos",
+        ...(field ? { field } : {}),
+      });
       return;
     }
     await prisma.product.create({
@@ -52,11 +69,19 @@ router.post("/admin/products", async (req, res, next) => {
         priceCents: parsed.data.priceCents ?? null,
         stock: parsed.data.stock ?? 0,
         loyaltyOnly: parsed.data.loyaltyOnly ?? false,
+        requestQuoteOnly: parsed.data.requestQuoteOnly ?? false,
         published: parsed.data.published ?? true,
       },
     });
     res.json({ ok: true });
   } catch (e) {
+    if (isProductSlugUniqueViolation(e)) {
+      res.status(409).json({
+        error: "Ya existe un producto con ese slug. Usá otro valor en el campo slug (URL corta).",
+        field: "slug",
+      });
+      return;
+    }
     next(e);
   }
 });
@@ -65,7 +90,12 @@ router.patch("/admin/products/:id", async (req, res, next) => {
   try {
     const parsed = productFormSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "Datos inválidos" });
+      const issue = parsed.error.issues[0];
+      const field = issue?.path[0] != null ? String(issue.path[0]) : undefined;
+      res.status(400).json({
+        error: issue?.message ?? "Datos inválidos",
+        ...(field ? { field } : {}),
+      });
       return;
     }
     const previous = await prisma.product.findUnique({
@@ -91,6 +121,7 @@ router.patch("/admin/products/:id", async (req, res, next) => {
         priceCents: parsed.data.priceCents ?? null,
         stock: parsed.data.stock ?? 0,
         loyaltyOnly: parsed.data.loyaltyOnly ?? false,
+        requestQuoteOnly: parsed.data.requestQuoteOnly ?? false,
         published: parsed.data.published ?? true,
       },
     });
@@ -98,6 +129,13 @@ router.patch("/admin/products/:id", async (req, res, next) => {
     await deleteUploadFilesIfUnreferenced(collectUploadPathsFromProduct(previous));
     res.json({ ok: true });
   } catch (e) {
+    if (isProductSlugUniqueViolation(e)) {
+      res.status(409).json({
+        error: "Ya existe otro producto con ese slug. Elegí un slug distinto.",
+        field: "slug",
+      });
+      return;
+    }
     next(e);
   }
 });
@@ -157,16 +195,27 @@ router.patch("/admin/orders/:id/status", async (req, res, next) => {
 
 router.get("/admin/users", async (req, res, next) => {
   try {
-    const users = await prisma.user.findMany({
+    const rows = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
         email: true,
         name: true,
         role: true,
-        loyaltyExpiresAt: true,
+        loyaltyCode: { select: { isActive: true, expiresAt: true } },
         createdAt: true,
       },
+    });
+    const users = rows.map((u) => {
+      const active = u.loyaltyCode?.isActive && u.loyaltyCode.expiresAt > new Date();
+      return {
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        loyaltyExpiresAt: active ? u.loyaltyCode!.expiresAt : null,
+        createdAt: u.createdAt,
+      };
     });
     res.json({ users });
   } catch (e) {
@@ -206,29 +255,52 @@ function generateCode(): string {
   return "MBR-" + randomBytes(4).toString("hex").toUpperCase();
 }
 
-const quantityBody = z.object({
-  quantity: z.coerce.number().int().min(1).max(50),
-});
-
 router.post("/admin/loyalty-codes", async (req, res, next) => {
   try {
-    const parsed = quantityBody.safeParse(req.body);
+    const parsed = adminCreateLoyaltyCodesSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Cantidad inválida" });
       return;
     }
     const count = parsed.data.quantity;
-    const expiresAt = new Date(Date.now() + LOYALTY_CODE_VALIDITY_DAYS * 86400000);
+    const expiresAt = new Date(Date.now() + parsed.data.validityDays * 86400000);
     const codes: string[] = [];
     for (let i = 0; i < count; i++) {
       let code = generateCode();
       while (await prisma.loyaltyCode.findUnique({ where: { code } })) {
         code = generateCode();
       }
-      await prisma.loyaltyCode.create({ data: { code, expiresAt } });
+      await prisma.loyaltyCode.create({
+        data: {
+          code,
+          expiresAt,
+          isActive: parsed.data.isActive,
+          validityDays: parsed.data.validityDays,
+        },
+      });
       codes.push(code);
     }
     res.json({ ok: true, codes });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.patch("/admin/loyalty-codes/:id", async (req, res, next) => {
+  try {
+    const parsed = adminUpdateLoyaltyCodeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Datos inválidos" });
+      return;
+    }
+    const data: { isActive?: boolean; validityDays?: number; expiresAt?: Date } = {};
+    if (parsed.data.isActive != null) data.isActive = parsed.data.isActive;
+    if (parsed.data.validityDays != null) {
+      data.validityDays = parsed.data.validityDays;
+      data.expiresAt = new Date(Date.now() + parsed.data.validityDays * 86400000);
+    }
+    await prisma.loyaltyCode.update({ where: { id: req.params.id }, data });
+    res.json({ ok: true });
   } catch (e) {
     next(e);
   }
@@ -338,6 +410,40 @@ router.delete("/admin/partners/:id", async (req, res, next) => {
     await prisma.partnerCompany.delete({ where: { id: req.params.id } });
     await deleteUploadFilesIfUnreferenced(paths);
     res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get("/admin/site-config", async (_req, res, next) => {
+  try {
+    const row = await prisma.siteSetting.findUnique({ where: { id: "default" } });
+    res.json({ heroImageUrl: row?.heroImageUrl ?? null });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.patch("/admin/site-config", async (req, res, next) => {
+  try {
+    const parsed = siteSettingSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Datos inválidos" });
+      return;
+    }
+    const raw = parsed.data.heroImageUrl;
+    const nextUrl = raw === "" || raw === null ? null : raw.trim() || null;
+    const prev = await prisma.siteSetting.findUnique({ where: { id: "default" } });
+    await prisma.siteSetting.upsert({
+      where: { id: "default" },
+      create: { id: "default", heroImageUrl: nextUrl },
+      update: { heroImageUrl: nextUrl },
+    });
+    if (prev?.heroImageUrl && prev.heroImageUrl !== nextUrl) {
+      const p = extractUploadsPublicPath(prev.heroImageUrl);
+      if (p) await deleteUploadFilesIfUnreferenced(new Set([p]));
+    }
+    res.json({ ok: true, heroImageUrl: nextUrl });
   } catch (e) {
     next(e);
   }

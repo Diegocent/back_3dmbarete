@@ -2,7 +2,6 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma";
 import { registerSchema, contactSchema } from "../lib/validators";
-import { LOYALTY_ACCESS_DAYS } from "../lib/constants";
 import {
   buildContactEmailHtml,
   contactTypeLabel,
@@ -32,7 +31,7 @@ router.post("/register", async (req, res, next) => {
     const submitted = (parsed.data.loyaltyCode ?? "").trim();
     let loyaltyVerifiedAt: Date | null = null;
     let loyaltyExpiresAt: Date | null = null;
-    let codeId: string | null = null;
+    let loyaltyCodeId: string | null = null;
 
     if (submitted) {
       const code = await prisma.loyaltyCode.findUnique({ where: { code: submitted } });
@@ -40,8 +39,8 @@ router.post("/register", async (req, res, next) => {
         res.status(400).json({ error: "El código ingresado no existe" });
         return;
       }
-      if (code.usedById) {
-        res.status(400).json({ error: "Este código ya fue utilizado" });
+      if (!code.isActive) {
+        res.status(400).json({ error: "Este código está inactivo" });
         return;
       }
       if (code.expiresAt < new Date()) {
@@ -49,12 +48,12 @@ router.post("/register", async (req, res, next) => {
         return;
       }
       loyaltyVerifiedAt = new Date();
-      loyaltyExpiresAt = new Date(Date.now() + LOYALTY_ACCESS_DAYS * 86400000);
-      codeId = code.id;
+      loyaltyCodeId = code.id;
+      loyaltyExpiresAt = code.expiresAt;
     }
 
     const passwordHash = await bcrypt.hash(parsed.data.password, env.bcryptSaltRounds);
-    const user = await prisma.user.create({
+    await prisma.user.create({
       data: {
         email,
         name: parsed.data.name,
@@ -62,15 +61,9 @@ router.post("/register", async (req, res, next) => {
         role: "CUSTOMER",
         loyaltyVerifiedAt,
         loyaltyExpiresAt,
+        loyaltyCodeId,
       },
     });
-
-    if (codeId) {
-      await prisma.loyaltyCode.update({
-        where: { id: codeId },
-        data: { usedById: user.id, usedAt: new Date() },
-      });
-    }
 
     res.json({ ok: true, loyaltyActivated: Boolean(loyaltyExpiresAt) });
   } catch (e) {
@@ -195,6 +188,15 @@ router.get("/products/by-slug/:slug", async (req, res, next) => {
       return;
     }
     res.json({ product: toProductDTO(row) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get("/site-config", async (_req, res, next) => {
+  try {
+    const row = await prisma.siteSetting.findUnique({ where: { id: "default" } });
+    res.json({ heroImageUrl: row?.heroImageUrl ?? null });
   } catch (e) {
     next(e);
   }

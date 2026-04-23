@@ -13,6 +13,7 @@ export type ProductDTO = {
   priceCents: number | null;
   stock: number;
   loyaltyOnly: boolean;
+  requestQuoteOnly: boolean;
 };
 
 export function parseProductImages(imagesJson: string): string[] {
@@ -44,6 +45,7 @@ export function toProductDTO(row: {
   priceCents: number | null;
   stock: number;
   loyaltyOnly: boolean;
+  requestQuoteOnly?: boolean;
 }): ProductDTO {
   return {
     id: row.id,
@@ -58,6 +60,7 @@ export function toProductDTO(row: {
     priceCents: row.priceCents,
     stock: row.stock,
     loyaltyOnly: row.loyaltyOnly,
+    requestQuoteOnly: Boolean(row.requestQuoteOnly),
   };
 }
 
