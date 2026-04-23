@@ -14,8 +14,8 @@ import { authRequired, requireAdmin } from "../middlewares/authMiddleware";
 import {
   collectUploadPathsFromPartner,
   collectUploadPathsFromProduct,
+  collectUploadPathsFromSiteSetting,
   deleteUploadFilesIfUnreferenced,
-  extractUploadsPublicPath,
 } from "../lib/upload-storage";
 
 const router = Router();
@@ -440,8 +440,7 @@ router.patch("/admin/site-config", async (req, res, next) => {
       update: { heroImageUrl: nextUrl },
     });
     if (prev?.heroImageUrl && prev.heroImageUrl !== nextUrl) {
-      const p = extractUploadsPublicPath(prev.heroImageUrl);
-      if (p) await deleteUploadFilesIfUnreferenced(new Set([p]));
+      await deleteUploadFilesIfUnreferenced(collectUploadPathsFromSiteSetting(prev));
     }
     res.json({ ok: true, heroImageUrl: nextUrl });
   } catch (e) {

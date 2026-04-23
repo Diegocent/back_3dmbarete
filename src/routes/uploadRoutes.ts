@@ -1,10 +1,7 @@
 import { Router } from "express";
-import path from "path";
-import fs from "fs/promises";
-import { randomBytes } from "crypto";
 import multer from "multer";
-import { env } from "../config/env";
 import { authRequired, requireAdmin } from "../middlewares/authMiddleware";
+import { uploadImageToCloudinary } from "../lib/cloudinary";
 
 const router = Router();
 
@@ -32,16 +29,6 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_IMAGE },
 });
-
-function publicUploadUrl(localPath: string): string {
-  const base = env.publicFilesBaseUrl.replace(/\/$/, "");
-  if (!base) {
-    throw new Error(
-      "Definí PUBLIC_FILES_BASE_URL o PUBLIC_BASE_URL en el entorno (URL pública del API, sin barra final).",
-    );
-  }
-  return `${base}${localPath}`;
-}
 
 router.post(
   "/panel/upload",
@@ -79,12 +66,12 @@ router.post(
         });
         return;
       }
-      const name = `${Date.now()}-${randomBytes(6).toString("hex")}${ext}`;
-      const dir = path.join(process.cwd(), "storage", "uploads", uploadScope);
-      await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(path.join(dir, name), buf);
-      const localPath = `/uploads/${uploadScope}/${name}`;
-      res.json({ url: publicUploadUrl(localPath) });
+      const uploaded = await uploadImageToCloudinary({
+        scope: uploadScope,
+        buffer: buf,
+        originalName: file.originalname || `image${ext}`,
+      });
+      res.json({ url: uploaded.url });
     } catch (e) {
       next(e);
     }

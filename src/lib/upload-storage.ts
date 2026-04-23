@@ -6,6 +6,7 @@ import fs from "fs/promises";
 import type { PartnerCompany, Product } from "@prisma/client";
 import { prisma } from "./prisma";
 import logger from "../config/logger";
+import { deleteCloudinaryAssetByPublicId, extractCloudinaryPublicId } from "./cloudinary";
 
 /** Solo rutas públicas que nosotros generamos al subir archivos. */
 const UPLOADS_PUBLIC_PATH = /^\/uploads\/(products|partners|site)\/[A-Za-z0-9._-]+$/;
@@ -28,16 +29,24 @@ export function extractUploadsPublicPath(ref: string | null | undefined): string
   return null;
 }
 
+function uploadRefFromString(ref: string | null | undefined): string | null {
+  const localPath = extractUploadsPublicPath(ref);
+  if (localPath) return localPath;
+  const cloudinaryPublicId = extractCloudinaryPublicId(ref);
+  if (cloudinaryPublicId) return `cloudinary:${cloudinaryPublicId}`;
+  return null;
+}
+
 export function collectUploadPathsFromProduct(row: Pick<Product, "imagesJson" | "specsFileUrl">): Set<string> {
   const set = new Set<string>();
-  const specs = extractUploadsPublicPath(row.specsFileUrl);
+  const specs = uploadRefFromString(row.specsFileUrl);
   if (specs) set.add(specs);
   try {
     const arr = JSON.parse(row.imagesJson) as unknown;
     if (Array.isArray(arr)) {
       for (const item of arr) {
         if (typeof item === "string") {
-          const p = extractUploadsPublicPath(item);
+          const p = uploadRefFromString(item);
           if (p) set.add(p);
         }
       }
@@ -50,14 +59,14 @@ export function collectUploadPathsFromProduct(row: Pick<Product, "imagesJson" | 
 
 export function collectUploadPathsFromSiteSetting(row: { heroImageUrl: string | null }): Set<string> {
   const set = new Set<string>();
-  const u = extractUploadsPublicPath(row.heroImageUrl);
+  const u = uploadRefFromString(row.heroImageUrl);
   if (u) set.add(u);
   return set;
 }
 
 export function collectUploadPathsFromPartner(row: Pick<PartnerCompany, "imageUrl">): Set<string> {
   const set = new Set<string>();
-  const p = extractUploadsPublicPath(row.imageUrl);
+  const p = uploadRefFromString(row.imageUrl);
   if (p) set.add(p);
   return set;
 }
@@ -89,6 +98,22 @@ export async function deleteLocalUploadFiles(publicPaths: Iterable<string>): Pro
       if (code !== "ENOENT") {
         logger.warn(`upload-storage: no se pudo borrar ${pub}`, e);
       }
+    }
+  }
+  return n;
+}
+
+async function deleteCloudinaryAssets(refs: Iterable<string>): Promise<number> {
+  let n = 0;
+  for (const ref of refs) {
+    if (!ref.startsWith("cloudinary:")) continue;
+    const publicId = ref.slice("cloudinary:".length);
+    if (!publicId) continue;
+    try {
+      await deleteCloudinaryAssetByPublicId(publicId);
+      n++;
+    } catch (e) {
+      logger.warn(`upload-storage: no se pudo borrar asset cloudinary ${publicId}`, e);
     }
   }
   return n;
@@ -165,9 +190,17 @@ export async function cleanupOrphanUploadFiles(): Promise<{ scanned: number; rem
 /** Tras borrar o actualizar BD: elimina archivos cuyas rutas ya no están referenciadas por nadie. */
 export async function deleteUploadFilesIfUnreferenced(publicPaths: Iterable<string>): Promise<number> {
   const ref = await buildReferencedUploadPathsSet();
-  const toDelete: string[] = [];
+  const toDeleteLocal: string[] = [];
+  const toDeleteCloudinary: string[] = [];
   for (const p of publicPaths) {
-    if (!ref.has(p)) toDelete.push(p);
+    if (ref.has(p)) continue;
+    if (p.startsWith("cloudinary:")) {
+      toDeleteCloudinary.push(p);
+    } else {
+      toDeleteLocal.push(p);
+    }
   }
-  return deleteLocalUploadFiles(toDelete);
+  const localDeleted = await deleteLocalUploadFiles(toDeleteLocal);
+  const cloudinaryDeleted = await deleteCloudinaryAssets(toDeleteCloudinary);
+  return localDeleted + cloudinaryDeleted;
 }

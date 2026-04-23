@@ -49,4 +49,5 @@ export const env = {
   ).replace(/\/$/, ""),
   resendApiKey: process.env.RESEND_API_KEY || "",
   emailFrom: process.env.EMAIL_FROM ?? "3D Mbarete <onboarding@resend.dev>",
+  cloudinaryUrl: process.env.CLOUDINARY_URL?.trim() || "",
 };
